@@ -1,0 +1,12 @@
+name: "my-website"
+navbar:
+  title: "My first website"
+  left:
+    - text: "Welcome"
+      href: "index.html"
+    - text: "CLT case study"
+      href: "CLT.html"
+    - text: "Beer & Breweries case study"
+      href: "Beer_MC.html"
+    - text: "Attrition case study"
+      href: "Project_2_MC.html"
