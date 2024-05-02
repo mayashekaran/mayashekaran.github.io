@@ -1,0 +1,11 @@
+---
+title: "About me"
+author: "MayaC"
+date: "2024-04-01"
+output: html_document
+---
+
+# Welcome to Maya Chandrashekaran's page
+## Data & Analytics executive in healthcare
+### I am in the Master's in Data Science program at SMU
+Please check out my experiments in the tabs!
