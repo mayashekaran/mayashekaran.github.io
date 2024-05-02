@@ -1,0 +1,399 @@
+---
+title: "Unit_8_Beer"
+author: "MayaC"
+date: "2024-02-27"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(fig.width = 10)  # Set the figure width to 10 inches
+
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r}
+library(tidyverse)
+library(dplyr)
+library(stringr)
+library(ggplot2)
+#connecting to the dataset - beer and breweries dataset provided for this project
+beers <- read.csv("Beers.csv", header= TRUE)
+breweries <- read.csv("Breweries.csv", header= TRUE)
+#check data
+head(beers)
+head(breweries)
+#create data frames to answer questions
+dfbeer = data.frame(BeerName = beers$Name,Beer_ID = beers$Beer_ID,ABV= beers$ABV,IBU = beers$IBU, Brew_ID = beers$Brewery_id, Style = beers$Style, Ounces = beers$Ounces)
+
+dfbrewery = data.frame(Brew_ID = breweries$Brew_ID,BreweryName = breweries$Name,City= breweries$City,State = breweries$State)
+#check data
+head(dfbeer)
+head(dfbrewery)
+
+#merge datasets -
+dfcombined <- merge(dfbeer,dfbrewery,"Brew_ID")
+
+#check data
+head(dfcombined)
+
+#Question 1 - How many breweries are present in each state?
+# Create a bar plot showing the count of breweries in each state
+library(ggplot2)
+ggplot(dfbrewery, aes(x = State)) +
+  geom_bar() +
+  labs(x = "State", y = "Number of Breweries", title = "Number of Breweries in Each State")
+
+#Question 2 Merge beer data with the breweries data. Print the first 6 observations and the last six observations to check the merged file.  
+#first 6 observations
+first_6_rows <- head(dfcombined,6)
+print(first_6_rows)
+
+#last 6 observations
+last_6_rows <- dfcombined[(nrow(dfcombined) - 5):nrow(dfcombined), ]
+print(last_6_rows)
+
+#managing missing values - ABV values are missing for 62 of the 2,405 rows and IBU values are missing for 1,005 of 2,410 rows. The ABV values look like there are missing completely at random. While I can't find any evidence of "missing at random" or "not missing at random" for IBU values, my gut says I am not looking at all the angles. I made a called to calculate the mean and populate the missing data with mean values. This has been done for both ABV and IBU. All the below questions are answered based on this dataset.
+# calculate mean for both variables at the Style level
+library(dplyr)
+
+dfcombined_Mean <- dfcombined %>%
+  group_by(Style) %>%
+  summarise(mean_ABV = mean(ABV, na.rm = TRUE),
+            mean_IBU = mean(IBU, na.rm = TRUE))
+#populate NA values for ABV and IBU with mean values
+# Merge dfcombined with dfcombined_Mean to get mean values for each style
+dfcombined_updated <- dfcombined %>%
+  left_join(dfcombined_Mean, by = "Style")
+
+# Replace NA values in ABV and IBU columns with corresponding mean values
+dfcombined_updated$ABV[is.na(dfcombined_updated$ABV)] <- dfcombined_updated$mean_ABV[is.na(dfcombined_updated$ABV)]
+dfcombined_updated$IBU[is.na(dfcombined_updated$IBU)] <- dfcombined_updated$mean_IBU[is.na(dfcombined_updated$IBU)]
+
+# Remove unnecessary columns (mean_ABV, mean_IBU) 
+dfcombined_updated <- dfcombined_updated %>%
+  select(-mean_ABV, -mean_IBU)
+
+# Print rows where IBU or ABV is NA
+dim(dfcombined_updated %>% filter(is.na(IBU) | is.na(ABV)))
+# there are 52 rows where none of the IBU values for that Style was populated. Hence we couldn't replace the NA with mean values. These were removed from the dataset for the below questions.
+
+
+#Question 4 - Compute the median alcohol content and international bitterness unit for each state. Plot a bar chart to compare.
+
+# Remove NA values from ABV and IBU columns
+dfcombined_clean <- dfcombined[!is.na(dfcombined$ABV) & !is.na(dfcombined$IBU), ]
+dfcombined_updated_clean <- dfcombined_updated[!is.na(dfcombined_updated$ABV) & !is.na(dfcombined_updated$IBU), ]
+
+#check data
+dim(dfcombined)
+dim(dfcombined_clean)
+dim(dfcombined_updated)
+dim(dfcombined_updated_clean)
+
+# Calculate median ABV and median IBU for each state
+medians_by_state <- dfcombined_updated_clean %>%
+  group_by(State) %>%
+  summarise(Median_ABV = median(ABV), Median_IBU = median(IBU, na.rm = TRUE))
+Overall_Median <- median(medians_by_state$Median_ABV)
+Overall_Median_I <- median(medians_by_state$Median_IBU)
+
+# check data
+head(medians_by_state,10)
+
+#plot the median values
+bar1 <- ggplot(medians_by_state, aes(x = State, y = Median_ABV)) +  # Move aes() inside ggplot()
+  geom_col(fill = 'blue') + 
+  labs(x = "State", y = "Median ABV", title = "Median Alcohol by Volume of Beers in Each State") +
+  theme(
+    plot.title = element_text(size = 20),
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    axis.text.y = element_text(size = 12),
+    axis.title = element_text(size = 14)
+  ) + 
+  geom_hline(yintercept = Overall_Median, color = "red")  # Add a horizontal line for overall median
+  
+bar2 = ggplot(medians_by_state, aes(x = State, y = Median_IBU)) +
+  geom_col(fill = 'green') + 
+  labs(x = "State", y = "Median IBU", title = "Median International Bitterness Unit of Beers in Each State") +
+   theme(
+    plot.title = element_text(size = 20),
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    axis.text.y = element_text(size = 12),
+    axis.title = element_text(size = 14)
+  ) + 
+  geom_hline(yintercept = Overall_Median_I, color = "red")  # Add a horizontal line for overall median
+
+#display both plots
+library(patchwork)
+bar1 / bar2
+
+#Question 5 - Which state has the maximum alcoholic (ABV) beer? Which state has the most bitter (IBU) beer?
+#state with maximum alcoholic beer
+max_abv <- max(dfcombined_updated_clean$ABV, na.rm = TRUE) 
+max_abv_index <- which.max(dfcombined_updated_clean$ABV)
+state_with_max_abv <- dfcombined_updated_clean$State[max_abv_index]
+print(state_with_max_abv)
+cat("State with maximum alcohol by volume beer is :",state_with_max_abv, "with ABV of",max_abv,"\n")
+
+#state with most bitter beer
+max_ibu <- max(dfcombined_updated_clean$IBU,na.rm = TRUE)
+max_ibu_index <- which.max(dfcombined_updated_clean$IBU)
+state_with_max_ibu <- dfcombined_updated_clean$State[max_ibu_index]
+print(state_with_max_ibu)
+cat("State with most bitter beer is :",state_with_max_ibu, "with IBU of",max_ibu,"\n")
+
+#Question 6 - Comment on the summary statistics and distribution of the ABV variable.
+#create a new region column
+midwest <- c( "IA","IL", "IN", "KS", "MI", "MN", "MO", "ND","NE", "OH", "SD", "WI")
+northeast <- c("CT","MA", "ME", "NH", "NJ", "NY", "PA", "RI", "VT")
+south <- c("AL","AR","DC","DE","FL","GA","KY","LA","MD","MS","NC","OK","SC","TN","TX","VA","WV")
+west <- c("AK","AZ","CA","CO","HI","ID","MT","NM","NV","OR","UT","WA","WY")
+ 
+# Clean the State column to remove leading and trailing whitespace
+dfcombined_updated_clean$State <- trimws(dfcombined_updated_clean$State)
+
+# Create a new column named "Region" and assign the region based on state
+dfcombined_updated_clean$Region <- ifelse(dfcombined_updated_clean$State %in% midwest, "Midwest",
+                                  ifelse(dfcombined_updated_clean$State %in% northeast, "Northeast",
+                                         ifelse(dfcombined_updated_clean$State %in% south, "South",
+                                                ifelse(dfcombined_updated_clean$State %in% west, "West", "Unknown"))))
+
+
+# Calculate summary statistics
+ABV <- dfcombined_updated_clean$ABV
+mean_ABV <- mean(ABV, na.rm = TRUE)  # Mean
+median_ABV <- median(ABV, na.rm = TRUE)  # Median
+min_ABV <- min(ABV, na.rm = TRUE)  # Minimum
+max_ABV <- max(ABV, na.rm = TRUE)  # Maximum
+q1_ABV <- quantile(ABV, probs = 0.25, na.rm = TRUE)  # First quartile (25th percentile)
+q3_ABV <- quantile(ABV, probs = 0.75, na.rm = TRUE)  # Third quartile (75th percentile)
+
+# Print summary statistics
+cat("Mean ABV:", mean_ABV, "\n")
+cat("Median ABV:", median_ABV, "\n")
+cat("Minimum ABV:", min_ABV, "\n")
+cat("Maximum ABV:", max_ABV, "\n")
+cat("First Quartile ABV:", q1_ABV, "\n")
+cat("Third Quartile ABV:", q3_ABV, "\n")
+
+#distribution
+ggplot(dfcombined_updated_clean,aes(x=ABV)) +
+  geom_histogram()
+
+#using another way
+hist(ABV, main = "Distribution of Alcohol By Volume (ABV)", xlab = "ABV", ylab = "Frequency")
+
+# Add summary statistics to the plot
+abline(v = mean_ABV, col = "red", lwd = 2)  # Mean line
+abline(v = median_ABV, col = "blue", lwd = 2)  # Median line
+legend("topright", legend = c("Mean", "Median"), col = c("red", "blue"), lwd = 2)
+
+#boxplot
+# Box plot with color and labels
+ggplot(dfcombined_updated_clean, aes(x = "", y = ABV, fill = Region)) +
+  geom_boxplot() +
+  labs(title = "Distribution of Alcohol By Volume (ABV) by Region", x = NULL, y = "Alcohol By Volume (ABV)", fill = "Region")
+
+
+#summary statement
+"The summary statistics for the ABV variable show that the mean alcohol by volume is 5.9%, with a median of 5.7%. The range of ABV values extends from 2.7% to 12.5%, with 5% as the first quartile and 6.8% as the third quartile. The distribution of ABV values appears to be right-skewed, indicating that the majority of beers have lower alcohol content. However, there are some outliers with exceptionally high ABV values, which may represent specialty beers."
+
+#question 7 Is there an apparent relationship between the bitterness of the beer and its alcoholic content? Draw a scatter plot
+
+#create a new region column
+midwest <- c( "IA","IL", "IN", "KS", "MI", "MN", "MO", "ND","NE", "OH", "SD", "WI")
+northeast <- c("CT","MA", "ME", "NH", "NJ", "NY", "PA", "RI", "VT")
+south <- c("AL","AR","DC","DE","FL","GA","KY","LA","MD","MS","NC","OK","SC","TN","TX","VA","WV")
+west <- c("AK","AZ","CA","CO","HI","ID","MT","NM","NV","OR","UT","WA","WY")
+ 
+# Clean the State column to remove leading and trailing whitespace
+dfcombined_updated_clean$State <- trimws(dfcombined_updated_clean$State)
+
+# Create a new column named "Region" and assign the region based on state
+dfcombined_updated_clean$Region <- ifelse(dfcombined_updated_clean$State %in% midwest, "Midwest",
+                                  ifelse(dfcombined_updated_clean$State %in% northeast, "Northeast",
+                                         ifelse(dfcombined_updated_clean$State %in% south, "South",
+                                                ifelse(dfcombined_updated_clean$State %in% west, "West", "Unknown"))))
+
+# Check the data
+unique(dfcombined_updated_clean$Region)
+head(dfcombined_updated_clean)
+
+
+#draw scatterplot
+dfcombined_updated_clean %>% select(State,Region,ABV,IBU) %>%
+  ggplot(aes(x= ABV, y= IBU,color = Region))+
+  geom_point()+labs(title = "Scatterplot of Alcohol by Volume Vs. International Bitterness Unit", x= "Alcohol by Volume", y= "International Bitterness Unit") 
+
+#summary statement
+"It looks like there is a slight positive association between Alcohol by Volume and International Bitterness Unit. While there is a general tendency for the bitterness to move in the same direction as alcohol by volume, there is also considerable variability around the trend line. Beers from all regions are represented in the variability around the trend line."
+
+#histogram by region for both IBU and ABV values
+ABV <- dfcombined_updated_clean %>%
+  select(State, Region, ABV, IBU) %>%
+  ggplot(aes(x = ABV, fill = Region)) +
+  geom_histogram() +
+  labs(title = "Alcohol by Volume by region") 
+
+IBU <- dfcombined_updated_clean %>%
+  select(State, Region, ABV, IBU) %>%
+  ggplot(aes(x = IBU, fill = Region)) +
+  geom_histogram() +
+  labs(title = "IBU by region") 
+
+library(patchwork)
+ABV / IBU
+
+#histogram by region for ABV and IBU values in facet wrap style
+dfcombined_updated_clean %>%
+  select(State, Region, ABV, IBU) %>%
+  ggplot(aes(x = ABV, fill = Region)) +
+  geom_histogram() +
+  labs(title = "Alcohol by Volume by region") +
+  facet_wrap(~Region)
+
+dfcombined_updated_clean %>%
+  select(State, Region, ABV, IBU) %>%
+  ggplot(aes(x = IBU, fill = Region)) +
+  geom_histogram() +
+  labs(title = "IBU by region") +
+  facet_wrap(~Region)
+
+#question 9 - use knn to explore relationship of ABV & IBU between IPA and other Ales
+#creating a data frame with styles of IPA and "ale" in the name
+library(dplyr)
+library(stringr)
+
+# Filter rows where the Style column contains "IPA" or "Ale"
+dfIPA_Ale <- dfcombined_updated_clean %>%
+  filter(str_detect(Style, "IPA") | grepl("\\bAle\\b", Style))
+
+# View the filtered data
+head(dfIPA_Ale)
+dim(dfIPA_Ale)
+dim(dfcombined_updated_clean)
+
+# Add a Type column to differentiate IPA from other Ales
+dfIPA_Ale$Type <- ifelse(str_detect(dfIPA_Ale$Style, "IPA"), "IPA", "Ale")
+
+#check data
+head(dfIPA_Ale)
+
+# draw scatterplot
+dfIPA_Ale %>%
+  select(State, Region, Type, ABV, IBU) %>%
+  ggplot(aes(x = ABV, y = IBU, color = Type)) +
+  geom_point() +
+  labs(
+    title = "Scatterplot of Alcohol by Volume Vs. International Bitterness Unit",
+    x = "Alcohol by Volume",
+    y = "International Bitterness Unit"
+  )
+
+# draw scatterplot by region
+dfIPA_Ale %>%
+  select(State, Region, Type, ABV, IBU) %>%
+  ggplot(aes(x = ABV, y = IBU, color = Type)) +
+  geom_point() +
+  labs(
+    title = "Scatterplot of Alcohol by Volume Vs. International Bitterness Unit",
+    x = "Alcohol by Volume",
+    y = "International Bitterness Unit"
+  )+
+  facet_wrap(~Region)
+
+#training and test datasets - knn classification
+library(class)
+library(caret)
+library(e1071)
+library(dplyr)
+
+set.seed(6)
+splitPerc = .7
+trainIndices = sample(1:dim(dfIPA_Ale)[1],round(splitPerc * dim(dfIPA_Ale)[1]))
+train = dfIPA_Ale[trainIndices,]
+test = dfIPA_Ale[-trainIndices,]
+#check data
+nrow(train)
+nrow(test)
+nrow(dfIPA_Ale)
+
+# k = 5
+classifications = knn(train[,c(4,5)],test[,c(4,5)],train$Type, prob = TRUE, k = 7)
+table(classifications,test$Type)
+confusionMatrix(table(classifications,test$Type), mode = "everything")
+
+#trying naive bayes
+#Train a NB model based on the training set using ABV and IBU. 
+model = naiveBayes(train[,c(4,5)],train$Type)
+#Use the model to predict the Type in the test set and use those results to evaluate the model based on accuracy, sensitivity and specificity. 
+table(predict(model,test[,c(4,5)]),test$Type)
+confusionMatrix(table(predict(model,test[,c(4,5)]),test$Type), mode = "everything")
+
+#bonus question - additional insights from the data 
+# Load necessary packages
+library(ggplot2)
+library(dplyr)
+library(maps)
+
+# Create a mapping table for state abbreviations to full names
+state_mapping <- data.frame(StateAbbrev = c("AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA", 
+                                            "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD", 
+                                            "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ", 
+                                            "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "SC", 
+                                            "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY"),
+                           StateFull = c("alabama", "alaska", "arizona", "arkansas", "california", "colorado", 
+                                         "connecticut", "delaware", "florida", "georgia", "hawaii", "idaho", 
+                                         "illinois", "indiana", "iowa", "kansas", "kentucky", "louisiana", 
+                                         "maine", "maryland", "massachusetts", "michigan", "minnesota", 
+                                         "mississippi", "missouri", "montana", "nebraska", "nevada", 
+                                         "new hampshire", "new jersey", "new mexico", "new york", "north carolina", 
+                                         "north dakota", "ohio", "oklahoma", "oregon", "pennsylvania", 
+                                         "rhode island", "south carolina", "south dakota", "tennessee", 
+                                         "texas", "utah", "vermont", "virginia", "washington", "west virginia", 
+                                         "wisconsin", "wyoming"))
+
+# Merge the mapping table with your data frame to get full state names
+dfcombined_updated_clean <- merge(dfcombined_updated_clean, state_mapping, by.x = "State", by.y = "StateAbbrev")
+
+# Aggregate the number of beers available by state
+state_beer_data <- dfcombined_updated_clean %>%
+  group_by(StateFull) %>%
+  summarise(TotalBeersAvailable = n())
+
+# Load US map data
+us_map <- map_data("state")
+
+# Merge your aggregated data with map data
+merged_data <- merge(us_map, state_beer_data, by.x = "region", by.y = "StateFull", all.x = TRUE)
+
+# Plot the map
+ggplot() +
+  geom_map(data = merged_data, map = merged_data,
+           aes(x = long, y = lat, map_id = region, fill = TotalBeersAvailable),
+           color = "black", size = 0.15) +
+  scale_fill_gradient(low = "lightblue", high = "darkblue", na.value = "grey") + # Adjust color gradient
+  labs(title = "Number of beer choices by State",fill = "Total Beers Available") +  # Label legend
+  coord_fixed(1.3) +  # Adjust aspect ratio
+  theme_void()        # Remove axis and grid lines
+
+#bonus question - most popular ounces
+#plot bar
+# Aggregate the number of beers available by Ounces
+Ounce_data <- dfcombined_updated_clean %>%
+  group_by(Ounces) %>%
+  summarise(TotalBeersAvailable = n())
+
+# Plot the bar graph
+ggplot(Ounce_data, aes(x = Ounces, y = TotalBeersAvailable)) +
+  geom_col(show.legend = FALSE, fill = "brown") +
+  labs(title = "Number of beers by ounce packaging")
+
+
+```
+
